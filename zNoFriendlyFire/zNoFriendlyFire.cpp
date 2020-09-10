@@ -127,7 +127,6 @@ namespace GOTHIC_ENGINE {
 
 
 
-
   HOOK Hook_zCBspBase_CollectVobsInBBox3D AS( &zCBspBase::CollectVobsInBBox3D, &zCBspBase::CollectVobsInBBox3D_Union );
 
   void zCBspBase::CollectVobsInBBox3D_Union( zCArray<zCVob*>& vobList, const zTBBox3D& bbox ) const {
