@@ -85,6 +85,7 @@ namespace GOTHIC_ENGINE {
 
 
 
+
   static oCNpc* s_RootNpc = Null;
 
   HOOK Hook_oCNpc_CreateVobList AS( &oCNpc::CreateVobList, &oCNpc::CreateVobList_Union );
@@ -137,7 +138,7 @@ namespace GOTHIC_ENGINE {
 
     if( s_RootNpc == player ) {
       if( s_RootNpc->fmode != NPC_WEAPON_NONE ) {
-        for( uint i = 0; i < vobList.GetNum(); i++ ) {
+        for( int i = 0; i < vobList.GetNum(); i++ ) {
           oCNpc* npc = vobList[i]->CastTo<oCNpc>();
           if( npc && !npc->CanDamage( player ) )
             vobList.RemoveIndex( i-- );
