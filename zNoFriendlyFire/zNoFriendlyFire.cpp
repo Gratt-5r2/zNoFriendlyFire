@@ -2,14 +2,27 @@
 // Union SOURCE file
 
 namespace GOTHIC_ENGINE {
-  Map<oCNpc*, uint> NpcsNoFocus;
+  static bool_t HooksEnabled = False;
+  static Map<oCNpc*, uint> NpcsNoFocus;
+  static Array<uint> NeverFocusInstances;
+  static Array<uint> AlwaysFocusInstances;
+
+
+  static void HoldNpcsNoFocus( oCNpc* npc ) {
+    auto& pair = NpcsNoFocus[npc];
+    if( pair.IsNull() )
+      return;
+
+    NpcsNoFocus.Insert( npc, Timer::GetTime() );
+  }
+
 
   static bool CheckNpcsNoFocus( oCNpc* npc ) {
     auto& pair = NpcsNoFocus[npc];
     if( pair.IsNull() )
       return true;
 
-    if( Timer::GetTime() - pair.GetValue() > 2500 ) {
+    if( Timer::GetTime() - pair.GetValue() > 2000 ) {
       NpcsNoFocus.Remove( npc );
       return true;
     }
@@ -18,77 +31,117 @@ namespace GOTHIC_ENGINE {
   }
 
 
-
-  bool oCNpc::CanDamage( oCNpc* npc ) {
-    bool IsFightSound   = oCZoneMusic::s_herostatus != oHERO_STATUS_STD;
-    bool IsEnemy        = GetAttitude( npc ) <= NPC_ATT_ANGRY;
-    bool IsFriendKiller = enemy && (enemy == player || enemy->GetAttitude( player ) >= NPC_ATT_NEUTRAL);
-
-    if( npc == player && aiscriptvars[15] )
-      return false;
-
-    if( !enemy ) {
-      if( !IsFightSound )
-        return CheckNpcsNoFocus( this );
-    }
-    else
-      NpcsNoFocus.Insert( this, Timer::GetTime() );
-
-    if( IsFriendKiller ) {
-      NpcsNoFocus.Remove( this );
-      return true;
-    }
-
-    if( IsEnemy ) {
-      NpcsNoFocus.Remove( this );
-      return true;
-    }
-
-    return CheckNpcsNoFocus( this );
+  static int GetPartyMemberID() {
+    zCPar_Symbol* sym = parser->GetSymbol( "AIV_PARTYMEMBER" );
+    if( !sym )
+#if ENGINE >= Engine_G2
+      return 15;
+#else
+      return 36;
+#endif
+    
+    int id;
+    sym->GetValue( id, 0 );
+    return id;
   }
 
+
+  bool oCNpc::IsEnemy( oCNpc* npc ) {
+    if( npc == this )
+      return false;
+
+    return npc && GetAttitude( npc ) <= NPC_ATT_ANGRY;
+  }
+
+
+  bool oCNpc::IsFightStatus() {
+    return oCZoneMusic::s_herostatus != oHERO_STATUS_STD;
+  }
+
+
+  bool oCNpc::IsFriendKiller( oCNpc* npc ) {
+    return npc && npc->enemy && (npc->enemy == player || !IsEnemy( npc->enemy ));
+  }
+
+
+  bool oCNpc::WantToKillSomebody() {
+    return enemy && state.curState.valid;
+  }
+
+
+  bool oCNpc::IsInFightMode() {
+    return fmode != 0;
+  }
+
+
+  bool oCNpc::IsPartyMember() {
+    static int AIV_PARTYMEMBER = GetPartyMemberID();
+    return aiscriptvars[AIV_PARTYMEMBER] != False && enemy != player;
+  }
+
+
+  bool oCNpc::PlayerCanDamage( oCNpc* npc ) {
+    if( !IsEnemy( npc ) ) {
+      if( npc->IsPartyMember() )
+        return false;
+
+      if( IsEnemy( npc->enemy ) && npc->IsInFightMode() )
+        return false;
+
+      if( IsFightStatus() && !npc->IsInFightMode() )
+        return false;
+    }
+
+    return true;
+  }
+
+
+  bool oCNpc::CanDamage( oCNpc* npc ) {
+    if( NeverFocusInstances.HasEqualSorted( npc->instanz ) && npc->enemy != player )
+      return false;
+
+    if( AlwaysFocusInstances.HasEqualSorted( npc->instanz ) )
+      return true;
+
+    if( !npc )
+      return true;
+
+    if( this != player ) {
+      // Exclude attacker from nofocus list
+      if( IsInFightMode() && enemy == player )
+        NpcsNoFocus.Remove( this );
+
+      // Anti-friendly-AOE
+      if( npc == player && enemy != npc && !IsEnemy( npc ) )
+        return false;
+
+      return true;
+    }
+
+    if( !PlayerCanDamage( npc ) )
+      NpcsNoFocus.Insert( npc, Timer::GetTime() );
+
+    return CheckNpcsNoFocus( npc );
+  }
 
 
   bool oCNpc::CanDamage( oSDamageDescriptor& desc ) {
-    return CanDamage( desc.pNpcAttacker );
+    return !desc.pNpcAttacker || desc.pNpcAttacker->CanDamage( this );
   }
 
 
-
-  HOOK Hook_oCNpc_OnDamage AS( &oCNpc::OnDamage, &oCNpc::OnDamage_Union );
+  HOOK Hook_oCNpc_OnDamage PATCH_IF( &oCNpc::OnDamage, &oCNpc::OnDamage_Union, false );
 
   void oCNpc::OnDamage_Union( oSDamageDescriptor& desc ) {
+    HoldNpcsNoFocus( this );
     if( CanDamage( desc ) )
       THISCALL( Hook_oCNpc_OnDamage )(desc);
   }
 
 
-
-  HOOK Hook_oCNpc_OnDamage_Hit AS( &oCNpc::OnDamage_Hit, &oCNpc::OnDamage_Hit_Union );
-
-  void oCNpc::OnDamage_Hit_Union( oSDamageDescriptor& desc ) {
-    if( CanDamage( desc ) )
-      THISCALL( Hook_oCNpc_OnDamage_Hit )(desc);
-  }
-
-
-
-  HOOK Hook_oCNpc_OnDamage_Sound AS( &oCNpc::OnDamage_Sound, &oCNpc::OnDamage_Sound_Union );
-
-  void oCNpc::OnDamage_Sound_Union( oSDamageDescriptor& desc ) {
-    if( CanDamage( desc ) )
-      THISCALL( Hook_oCNpc_OnDamage_Sound )(desc);
-  }
-
-
-
-
-
-
-
   static oCNpc* s_RootNpc = Null;
 
-  HOOK Hook_oCNpc_CreateVobList AS( &oCNpc::CreateVobList, &oCNpc::CreateVobList_Union );
+  HOOK Hook_oCNpc_CreateVobList PATCH_IF( &oCNpc::CreateVobList, &oCNpc::CreateVobList_Union, false );
 
   void oCNpc::CreateVobList_Union( float dist ) {
     s_RootNpc = this;
@@ -97,8 +150,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-
-  HOOK Hook_oCNpc_CreateVobList_Array AS( &oCNpc::CreateVobList, &oCNpc::CreateVobList_Array_Union );
+  HOOK Hook_oCNpc_CreateVobList_Array PATCH_IF( &oCNpc::CreateVobList, &oCNpc::CreateVobList_Array_Union, false );
 
   void oCNpc::CreateVobList_Array_Union( zCArray<zCVob*>& vobList, float dist ) {
     s_RootNpc = this;
@@ -107,8 +159,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-
-  HOOK Hook_oCNpc_GetNearestValidVob AS( &oCNpc::GetNearestValidVob, &oCNpc::GetNearestValidVob_Union );
+  HOOK Hook_oCNpc_GetNearestValidVob PATCH_IF( &oCNpc::GetNearestValidVob, &oCNpc::GetNearestValidVob_Union, false );
 
   void oCNpc::GetNearestValidVob_Union( float dist ) {
     s_RootNpc = this;
@@ -117,8 +168,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-
-  HOOK Hook_oCNpc_GetNearestVob AS( &oCNpc::GetNearestVob, &oCNpc::GetNearestVob_Union );
+  HOOK Hook_oCNpc_GetNearestVob AS_IF( &oCNpc::GetNearestVob, &oCNpc::GetNearestVob_Union, false );
 
   void oCNpc::GetNearestVob_Union( float max_dist ) {
     s_RootNpc = this;
@@ -127,8 +177,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-
-  HOOK Hook_zCBspBase_CollectVobsInBBox3D AS( &zCBspBase::CollectVobsInBBox3D, &zCBspBase::CollectVobsInBBox3D_Union );
+  HOOK Hook_zCBspBase_CollectVobsInBBox3D PATCH_IF( &zCBspBase::CollectVobsInBBox3D, &zCBspBase::CollectVobsInBBox3D_Union, false );
 
   void zCBspBase::CollectVobsInBBox3D_Union( zCArray<zCVob*>& vobList, const zTBBox3D& bbox ) const {
     THISCALL( Hook_zCBspBase_CollectVobsInBBox3D )(vobList, bbox);
@@ -140,12 +189,44 @@ namespace GOTHIC_ENGINE {
       if( s_RootNpc->fmode != NPC_WEAPON_NONE ) {
         for( int i = 0; i < vobList.GetNum(); i++ ) {
           oCNpc* npc = vobList[i]->CastTo<oCNpc>();
-          if( npc && !npc->CanDamage( player ) )
+          if( npc && !player->CanDamage( npc ) )
             vobList.RemoveIndex( i-- );
         }
       }
       else
         NpcsNoFocus.Clear();
+    }
+  }
+
+
+  void EnableHooks() {
+    Hook_oCNpc_OnDamage.Commit();
+    Hook_oCNpc_CreateVobList.Commit();
+    Hook_oCNpc_CreateVobList_Array.Commit();
+    Hook_oCNpc_GetNearestValidVob.Commit();
+    Hook_oCNpc_GetNearestVob.Commit();
+    Hook_zCBspBase_CollectVobsInBBox3D.Commit();
+  }
+
+
+  void DisableHooks() {
+    Hook_oCNpc_OnDamage.Detach();
+    Hook_oCNpc_CreateVobList.Detach();
+    Hook_oCNpc_CreateVobList_Array.Detach();
+    Hook_oCNpc_GetNearestValidVob.Detach();
+    Hook_oCNpc_GetNearestVob.Detach();
+    Hook_zCBspBase_CollectVobsInBBox3D.Detach();
+  }
+
+
+  void UpdateOptions() {
+    int enabled = zoptions->ReadBool( "zNoFriendlyFire", "Enabled", True );
+    if( enabled != HooksEnabled ) {
+      HooksEnabled = enabled;
+      if( HooksEnabled )
+        EnableHooks();
+      else
+        DisableHooks();
     }
   }
 }

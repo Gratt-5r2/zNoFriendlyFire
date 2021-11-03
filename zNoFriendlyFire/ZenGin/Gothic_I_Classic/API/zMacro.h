@@ -1,4 +1,4 @@
-// Supported with union (c) 2018 Union team
+// Supported with union (c) 2018-2021 Union team
 
 #ifndef __ZMACRO_H__VER0__
 #define __ZMACRO_H__VER0__
@@ -10,7 +10,7 @@ namespace Gothic_I_Classic {
 #define zNEW( obj ) new obj
 #define zDELETE( obj ) delete obj
 #ifndef SAFE_DELETE
-#define SAFE_DELETE( obj ) if( obj ) { delete obj; obj = 0 }
+#define SAFE_DELETE( obj ) if( obj ) { delete obj; obj = 0; }
 #endif
 #define zCall( address ) { XCALL( address ); }
 #define zInit( call ) { if( Union.GetEngineVersion() == Engine_G1 ) call; }

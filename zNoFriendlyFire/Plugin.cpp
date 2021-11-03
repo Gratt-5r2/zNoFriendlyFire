@@ -3,10 +3,6 @@
 
 namespace GOTHIC_ENGINE {
 
-  
-
-
-
   // TO DO
   // Your code ...
 
@@ -14,19 +10,13 @@ namespace GOTHIC_ENGINE {
   }
 
   void Game_Init() {
+    UpdateOptions();
   }
 
   void Game_Exit() {
   }
 
   void Game_Loop() {
-#if _DEBUG
-    oCNpc* focusNpc = player->GetFocusNpc();
-    if( focusNpc ) {
-      screen->PrintCX(3500, focusNpc->CanDamage( player ) );
-      screen->PrintCX(4000, focusNpc->GetAttitude( player ) );
-    }
-#endif
   }
 
   // Information about current saving or loading world
@@ -39,6 +29,7 @@ namespace GOTHIC_ENGINE {
   }
 
   void LoadBegin() {
+    NpcsNoFocus.Clear();
   }
 
   void LoadEnd() {
@@ -80,7 +71,47 @@ namespace GOTHIC_ENGINE {
   void Game_Unpause() {
   }
   
+  int AI_SetNeverFocusInstance() {
+    oCNpc* instance = (oCNpc*)parser->GetInstance();
+    if( instance )
+      NeverFocusInstances.InsertSorted( instance->instanz );
+    return True;
+  }
+
+  int AI_SetAlwaysFocusInstance() {
+    oCNpc* instance = (oCNpc*)parser->GetInstance();
+    if( instance )
+      AlwaysFocusInstances.InsertSorted( instance->instanz );
+    return True;
+  }
+
+  int AI_SetNeverFocusInstanceName() {
+    zSTRING instanceName;
+    parser->GetParameter( instanceName );
+    int index = parser->GetIndex( instanceName );
+    if( index != Invalid )
+      NeverFocusInstances.InsertSorted( index );
+    return True;
+  }
+
+  int AI_SetAlwaysFocusInstanceName() {
+    zSTRING instanceName;
+    parser->GetParameter( instanceName );
+    int index = parser->GetIndex( instanceName );
+    if( index != Invalid )
+      AlwaysFocusInstances.InsertSorted( index );
+    return True;
+  }
+
   void Game_DefineExternals() {
+    parser->DefineExternal( "AI_SetNeverFocusInstance",      AI_SetNeverFocusInstance,      zPAR_TYPE_VOID, zPAR_TYPE_INSTANCE, zPAR_TYPE_VOID );
+    parser->DefineExternal( "AI_SetAlwaysFocusInstance",     AI_SetAlwaysFocusInstance,     zPAR_TYPE_VOID, zPAR_TYPE_INSTANCE, zPAR_TYPE_VOID );
+    parser->DefineExternal( "AI_SetNeverFocusInstanceName",  AI_SetNeverFocusInstanceName,  zPAR_TYPE_VOID, zPAR_TYPE_STRING,   zPAR_TYPE_VOID );
+    parser->DefineExternal( "AI_SetAlwaysFocusInstanceName", AI_SetAlwaysFocusInstanceName, zPAR_TYPE_VOID, zPAR_TYPE_STRING,   zPAR_TYPE_VOID );
+  }
+
+  void Game_ApplyOptions() {
+    UpdateOptions();
   }
 
   /*
@@ -88,7 +119,7 @@ namespace GOTHIC_ENGINE {
     - Game_Entry           * Gothic entry point
     - Game_DefineExternals * Define external script functions
     - Game_Init            * After DAT files init
-  
+
   Functions call order on Change level:
     - Game_LoadBegin_Trigger     * Entry in trigger
     - Game_LoadEnd_Trigger       *
@@ -97,14 +128,14 @@ namespace GOTHIC_ENGINE {
     - Game_SaveBegin             * Save previous level information
     - Game_SaveEnd               *
     - Game_LoadEnd_ChangeLevel   *
-  
+
   Functions call order on Save game:
     - Game_Pause     * Open menu
     - Game_Unpause   * Click on save
     - Game_Loop      * Frame call window
     - Game_SaveBegin * Save begin
     - Game_SaveEnd   *
-  
+
   Functions call order on Load game:
     - Game_Pause              * Open menu
     - Game_Unpause            * Click on load
@@ -117,7 +148,10 @@ namespace GOTHIC_ENGINE {
     Enabled( AppDefault ) Game_Entry,
     Enabled( AppDefault ) Game_Init,
     Enabled( AppDefault ) Game_Exit,
+    Enabled( AppDefault ) Null,
     Enabled( AppDefault ) Game_Loop,
+    Enabled( AppDefault ) Null,
+    Enabled( AppDefault ) Null,
     Enabled( AppDefault ) Game_SaveBegin,
     Enabled( AppDefault ) Game_SaveEnd,
     Enabled( AppDefault ) Game_LoadBegin_NewGame,
@@ -130,6 +164,7 @@ namespace GOTHIC_ENGINE {
     Enabled( AppDefault ) Game_LoadEnd_Trigger,
     Enabled( AppDefault ) Game_Pause,
     Enabled( AppDefault ) Game_Unpause,
-    Enabled( AppDefault ) Game_DefineExternals
+    Enabled( AppDefault ) Game_DefineExternals,
+    Enabled( AppDefault ) Game_ApplyOptions
   );
 }

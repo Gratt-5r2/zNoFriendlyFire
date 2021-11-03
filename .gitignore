@@ -343,3 +343,5 @@ ASALocalRun/
 healthchecksdb
 *.tlog
 *.txt
+/zNoFriendlyFire/G2A Release
+/zNoFriendlyFire/G1 Release

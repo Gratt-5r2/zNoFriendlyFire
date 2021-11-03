@@ -1,4 +1,4 @@
-// Supported with union (c) 2018 Union team
+// Supported with union (c) 2018-2021 Union team
 
 #ifndef __ZGLOBAL_H__VER1__
 #define __ZGLOBAL_H__VER1__
@@ -136,18 +136,18 @@ namespace Gothic_I_Addon {
     }
   }
   
-  uint ASTAPI FindEngineAddress( string from, string to );
+  uint ASTAPI FindEngineAddress( CStringA from, CStringA to );
 
   template <typename T>
-  inline CInvoke<T> InvokeAuto_BySignature( const string& sig, T ptr, const uint32& flag = IVK_AUTO ) {
+  inline CInvoke<T> InvokeAuto_BySignature( const CStringA& sig, T ptr, const uint32& flag = IVK_AUTO ) {
     uint adr = FindEngineAddress( sig, typeid( ptr ).name() );
     return CInvoke<T>( adr, ptr, flag );
   }
 
   template <typename T>
-  inline ModulePatchCallInvoker<T> AutoModulePatchCallInvoker_BySignature( const string& sig, T ptr ) {
+  inline ModulePatchCallInvoker<T> AutoModulePatchCallInvoker_BySignature( const CStringA& sig, T ptr, bool commit = true ) {
     uint adr = FindEngineAddress( sig, typeid(ptr).name() );
-    return ModulePatchCallInvoker<T>( adr, ptr );
+    return ModulePatchCallInvoker<T>( adr, ptr, commit );
   }
 
 } // namespace Gothic_II_Addon
