@@ -3,6 +3,7 @@
 
 namespace GOTHIC_ENGINE {
   static bool_t HooksEnabled = False;
+  static int HoldCompanions = False;
   static Map<oCNpc*, uint> NpcsNoFocus;
   static Array<uint> NeverFocusInstances;
   static Array<uint> AlwaysFocusInstances;
@@ -39,18 +40,29 @@ namespace GOTHIC_ENGINE {
 #else
       return 36;
 #endif
-    
     int id;
     sym->GetValue( id, 0 );
     return id;
   }
 
 
+  static int GetSummonedByPCStateID() {
+    int index = parser->GetIndex( "ZS_MM_SUMMONEDBYPC" );
+    return index != Invalid ? index : -999;
+  }
+
+
   bool oCNpc::IsEnemy( oCNpc* npc ) {
+    if( !npc )
+      return false;
+
     if( npc == this )
       return false;
 
-    return npc && GetAttitude( npc ) <= NPC_ATT_ANGRY;
+    if( npc->IsPartyMember() )
+      return false;
+
+    return GetAttitude( npc ) <= NPC_ATT_ANGRY;
   }
 
 
@@ -75,16 +87,27 @@ namespace GOTHIC_ENGINE {
 
 
   bool oCNpc::IsPartyMember() {
+    if( enemy == player )
+      return false;
+
     static int AIV_PARTYMEMBER = GetPartyMemberID();
-    return aiscriptvars[AIV_PARTYMEMBER] != False && enemy != player;
+    if( aiscriptvars[AIV_PARTYMEMBER] == True )
+      return true;
+
+    // Gothic 1 special condition where the self NPC is
+    // not a summoned NPC. Because of this party member
+    // property is not assigned. This is the easy alternative
+    // way to check a summoned NPC as a party member NPC.
+    static int ZS_MM_SummonedByPC = GetSummonedByPCStateID();
+    return startAIState == ZS_MM_SummonedByPC;
   }
 
 
   bool oCNpc::PlayerCanDamage( oCNpc* npc ) {
-    if( !IsEnemy( npc ) ) {
-      if( npc->IsPartyMember() )
-        return false;
+    if( (!HoldCompanions || !npc->enemy) && npc->IsPartyMember() )
+      return false;
 
+    if( !IsEnemy( npc ) ) {
       if( IsEnemy( npc->enemy ) && npc->IsInFightMode() )
         return false;
 
@@ -221,6 +244,7 @@ namespace GOTHIC_ENGINE {
 
   void UpdateOptions() {
     int enabled = zoptions->ReadBool( "zNoFriendlyFire", "Enabled", True );
+    HoldCompanions = zoptions->ReadBool( "zNoFriendlyFire", "HoldCompanions", False );
     if( enabled != HooksEnabled ) {
       HooksEnabled = enabled;
       if( HooksEnabled )
